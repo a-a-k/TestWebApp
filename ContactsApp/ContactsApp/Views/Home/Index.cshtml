@@ -1,0 +1,22 @@
+﻿@{
+    ViewBag.Title = "Index";
+}
+
+@Model
+
+ <!DOCTYPE html>
+
+ <html>
+ <head>
+     <meta name="viewport" content="width=device-width" />
+     <title>Index</title>
+ </head>
+ <body>
+     <header><br /><br />Порядок загрузки файла:<br />1. Колонки должны иметь следующие заголовки - ФИО, Телефон, Почтовый индекс, Регион, Город, Адрес, Email;<br />2. Поля ФИО и Телефон обязательны к заполнению, если одно из них будет отсутствовать или иметь пустое значение - файл не будет импортирован или контакт не будет сохранён;<br />3. Если один из реквизитов адреса будет пустым - адрес не будет сохранён.<br /><br /></header>
+    @using (Html.BeginForm("Index", "Home", FormMethod.Post, new { enctype = "multipart/form-data" }))
+    {
+        <input type="file" name="file" />
+        <input type="submit" value="OK" />
+    }
+ </body>
+ </html>
