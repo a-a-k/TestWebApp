@@ -49,6 +49,7 @@ namespace ContactsApp.Controllers
                         var rowCount = worksheet.Dimension.Rows;
                         var colCount = worksheet.Dimension.Columns;
                         var columns = new Dictionary<string, byte>();
+                        columns.Add("", 0);
                         
                         for (byte col = 1; col <= colCount; col++)
                         {
@@ -89,11 +90,12 @@ namespace ContactsApp.Controllers
                                 continue;
                             }
 
-                            var zip = worksheet.Cells[row, columns.GetValueOrDefault("почтовый индекс")].Text;
-                            var region = worksheet.Cells[row, columns.GetValueOrDefault("регион")].Text;
-                            var city = worksheet.Cells[row, columns.GetValueOrDefault("город")].Text;
-                            var address = worksheet.Cells[row, columns.GetValueOrDefault("адрес")].Text;
-                            var email = worksheet.Cells[row, columns.GetValueOrDefault("email")].Text;
+                            byte col;
+                            var zip = columns.TryGetValue("почтовый индекс", out col) ?  worksheet.Cells[row, col].Text : string.Empty;
+                            var region = columns.TryGetValue("регион", out col) ? worksheet.Cells[row, col].Text : string.Empty;
+                            var city = columns.TryGetValue("город", out col) ? worksheet.Cells[row, col].Text : string.Empty;  
+                            var address = columns.TryGetValue("адрес", out col) ? worksheet.Cells[row, col].Text : string.Empty;  
+                            var email = columns.TryGetValue("email", out col) ? worksheet.Cells[row, col].Text : string.Empty;  
                         
                             await table.ExecuteAsync(TableOperation.InsertOrReplace(new Contact(phone, name, zip, region, city, address, email)));
                             saved++;
