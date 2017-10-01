@@ -1,15 +1,10 @@
-﻿using ContactsApp.Models;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using ContactsApp.Utils;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
-using OfficeOpenXml;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace ContactsApp.Controllers
 {
@@ -37,111 +32,32 @@ namespace ContactsApp.Controllers
                 return View("Index", "Файл пуст или не выбран");
             }
 
+            var excel = new ExcelWorker();
+            var azureStorageTable = new AzureCloudStorageWorker();
+
             try
             {
-                using (var memoryStream = new MemoryStream())
+                await excel.Load(file);
+                
+                if (!excel.CheckRequiredColumns(new List<string> { "фио", "телефон" }))
                 {
-                    await file.CopyToAsync(memoryStream).ConfigureAwait(false);
-
-                    using (var package = new ExcelPackage(memoryStream))
-                    {
-                        var worksheet = package.Workbook.Worksheets.FirstOrDefault();
-                        var rowCount = worksheet.Dimension.Rows;
-                        var colCount = worksheet.Dimension.Columns;
-                        var columns = new Dictionary<string, byte>();
-                        columns.Add("", 0);
-                        
-                        for (byte col = 1; col <= colCount; col++)
-                        {
-                            columns.Add(worksheet.Cells[1, col].Value.ToString().ToLower(), col);
-                        }
-
-                        if (!columns.ContainsKey("фио") || !columns.ContainsKey("телефон"))
-                        {
-                            return View("Index", "Ошибка - отсутствуют обязательные для заполнения колонки");
-                        }
-
-                        if (!CloudStorageAccount.TryParse("DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1", out var storageAccount))
-                        {
-                            return View("Index", "Ошибка CloudStorageAccount.TryParse");
-                        }
-
-                        var tableClient = storageAccount.CreateCloudTableClient();
-                        var table = tableClient.GetTableReference("Contacts");
-                        await table.CreateIfNotExistsAsync();
-                        var skipped = 0;
-                        var saved = 0;
-
-                        for (int row = 2; row <= rowCount; row++)
-                        {
-                            var sourcePhone = worksheet.Cells[row, columns.GetValueOrDefault("телефон")].Text;
-                            var sourceName = worksheet.Cells[row, columns.GetValueOrDefault("фио")].Text;
-                            if (string.IsNullOrEmpty(sourcePhone) || string.IsNullOrEmpty(sourceName))
-                            {
-                                skipped++;
-                                continue;
-                            }
-
-                            var phone = ClearPhone(sourcePhone);
-                            var name = ClearName(sourceName);
-                            if (string.IsNullOrEmpty(phone) || string.IsNullOrEmpty(name))
-                            {
-                                skipped++;
-                                continue;
-                            }
-
-                            byte col;
-                            var zip = columns.TryGetValue("почтовый индекс", out col) ?  worksheet.Cells[row, col].Text : string.Empty;
-                            var region = columns.TryGetValue("регион", out col) ? worksheet.Cells[row, col].Text : string.Empty;
-                            var city = columns.TryGetValue("город", out col) ? worksheet.Cells[row, col].Text : string.Empty;  
-                            var address = columns.TryGetValue("адрес", out col) ? worksheet.Cells[row, col].Text : string.Empty;  
-                            var email = columns.TryGetValue("email", out col) ? worksheet.Cells[row, col].Text : string.Empty;  
-                        
-                            await table.ExecuteAsync(TableOperation.InsertOrReplace(new Contact(phone, name, zip, region, city, address, email)));
-                            saved++;
-                        }
-
-                        if (saved == 0)
-                        {
-                            return View("Index", $"Записано {saved} контактов, пропущено - {skipped}");
-                        }
-
-                        return View("Index", $"Записано {saved} контактов, пропущено - {skipped}");
-                    }
+                    return View("Index", "Ошибка - отсутствуют обязательные для заполнения колонки");
                 }
 
+                var connectionString = Program.Configuration["ConnectionStrings:AzureTableStorage"];
+                if (!await azureStorageTable.ConnectAsync(connectionString, "Contacts"))
+                {
+                    return View("Index", "Ошибка соединения с хранилищем");
+                }
+
+                await azureStorageTable.InsertOrReplace(excel.Read(true));
+                
+                return View("Index", $"Записано {excel.Saved} контактов, пропущено - {excel.Skipped}");
             }
             catch (Exception ex)
             {
                 return View("Index", $"Ошибка - {ex.Message}");
             }
-        }
-
-        private string ClearName(string sourceName)
-        {
-            if (!sourceName.All(x => Char.IsLetter(x) || Char.IsWhiteSpace(x)))
-            {
-                return string.Empty;
-            }
-
-            var parts = sourceName.Split(' ');
-            var result = parts.Aggregate((s1, s2) => $"{s1.Trim()} {s2.Trim()}").TrimEnd();
-            
-            return result;
-        }
-
-        private string ClearPhone(string sourcePhone)
-        {
-            var correctDelimeters = new char[] { '(', ')', '-', ' ', '+' };
-            if (!sourcePhone.All(x => Char.IsDigit(x) || correctDelimeters.Contains(x)) || sourcePhone.Length < 10)
-            {
-                return string.Empty;
-            }
-            var result = new string(sourcePhone.Select(x => correctDelimeters.Contains(x) ? ' ' : x).ToArray()).Replace(" ", "");
-            var firstDigit = result.First();
-            result = firstDigit == '8' ? result : firstDigit == '7' ? $"8{result.Substring(1)}" : firstDigit == '9' ? $"8{result}" : string.Empty;
-
-            return result.Length > 11 ? string.Empty : result;
         }
     }
 }

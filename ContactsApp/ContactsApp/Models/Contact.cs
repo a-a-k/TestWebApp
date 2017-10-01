@@ -1,7 +1,7 @@
 ﻿using System;
-using Microsoft.WindowsAzure.Storage.Table;
-using System.Text.RegularExpressions;
 using System.Linq;
+using System.Text.RegularExpressions;
+using Microsoft.WindowsAzure.Storage.Table;
 
 namespace ContactsApp.Models
 {
@@ -23,9 +23,9 @@ namespace ContactsApp.Models
         {
             PartitionKey = phone;
             RowKey = string.Empty;
-            this.PhoneNumber = phone;
-            this.FullName = name;
-            this.Email = IsValidEmail(email) ? email : string.Empty;
+            PhoneNumber = phone;
+            FullName = name;
+            Email = IsValidEmail(email) ? email : string.Empty;
             SetAddress(zip, region, city, address);
         }
 
@@ -33,17 +33,17 @@ namespace ContactsApp.Models
         {
             if (zip.Any(x => !Char.IsDigit(x)) || region.Any(x => !Char.IsLetter(x) || !Char.IsWhiteSpace(x) || x.Equals('-')) || city.Any(x => !Char.IsLetter(x) || !Char.IsWhiteSpace(x) || x.Equals('-')) || address.Any(x => Char.IsSymbol(x)))
             {
-                this.PostalCode = string.Empty;
-                this.Region = string.Empty;
-                this.City = string.Empty;
-                this.Address = string.Empty;
+                PostalCode = string.Empty;
+                Region = string.Empty;
+                City = string.Empty;
+                Address = string.Empty;
             }
             else
             {
-                this.PostalCode = zip;
-                this.Region = region;
-                this.City = city;
-                this.Address = address;
+                PostalCode = zip;
+                Region = region;
+                City = city;
+                Address = address;
             }
         }
 
